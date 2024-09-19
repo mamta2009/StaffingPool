@@ -14,79 +14,28 @@
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4">User List</h1>
-        
-        <% if (currentUser.role === 'System Admin' || currentUser.role === 'Admin') { %>
-            <div class="mb-4">
-                <a href="/add-user" class="btn btn-success">New User</a>
-            </div>
-            <div class="add-company-section mb-4">
-                <h2>Add New Company</h2>
-                <form id="addCompanyForm" class="form-inline">
-                    <input type="text" id="companyName" name="companyName" class="form-control mr-2" placeholder="Company Name" required>
-                    <button type="submit" class="btn btn-primary">Add Company</button>
-                </form>
-            </div>
-        <% } %>
-
-        <% const groupedUsers = groupUsersByCompany(users); %>
-        <% Object.entries(groupedUsers).forEach(([company, companyUsers]) => { %>
-            <div class="company-section">
-                <div class="company-header d-flex justify-content-between align-items-center">
-                    <h2><%= company === 'Unassigned' ? 'IA' : company %></h2>
-                    <% if (currentUser.role === 'System Admin' || currentUser.role === 'Admin') { %>
-                        <button onclick="editCompany('<%= company %>')" class="btn btn-secondary btn-sm">Edit Company</button>
-                    <% } %>
-                </div>
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Manager</th>
-                            <th>Supervisor</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% companyUsers.forEach(user => { %>
-                            <tr>
-                                <td><%= user.firstName %> <%= user.lastName %></td>
-                                <td><%= user.email %></td>
-                                <td>
-                                    <% if (currentUser.role === 'System Admin' || currentUser.role === 'Admin') { %>
-                                        <select onchange="changeRole('<%= user.id %>', this.value)" class="form-control form-control-sm">
-                                            <option value="User" <%= user.role === 'User' ? 'selected' : '' %>>User</option>
-                                            <option value="Supervisor" <%= user.role === 'Supervisor' ? 'selected' : '' %>>Supervisor</option>
-                                            <option value="Manager" <%= user.role === 'Manager' ? 'selected' : '' %>>Manager</option>
-                                            <option value="Admin" <%= user.role === 'Admin' ? 'selected' : '' %>>Admin</option>
-                                            <% if (currentUser.role === 'System Admin') { %>
-                                                <option value="System Admin" <%= user.role === 'System Admin' ? 'selected' : '' %>>System Admin</option>
-                                            <% } %>
-                                        </select>
-                                    <% } else { %>
-                                        <%= user.role %>
-                                    <% } %>
-                                </td>
-                                <td><%= getManagerName(user.managerId) %></td>
-                                <td><%= getSupervisorName(user.supervisorId) %></td>
-                                <td>
-                                    <div class="btn-group" role="group">
-                                        <% if (currentUser.role === 'System Admin' || currentUser.role === 'Admin') { %>
-                                            <button onclick="editUser('<%= user.id %>')" class="btn btn-primary btn-sm">Edit</button>
-                                            <button onclick="deleteUser('<%= user.id %>')" class="btn btn-danger btn-sm">Delete</button>
-                                        <% } else if (currentUser.id === user.id) { %>
-                                            <button onclick="editUser('<%= user.id %>')" class="btn btn-primary btn-sm">Edit Profile</button>
-                                        <% } %>
-                                    </div>
-                                </td>
-                            </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-        <% }) %>
+        <h1>User List</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% users.forEach(user => { %>
+                    <tr>
+                        <td><%= user.firstName %> <%= user.lastName %></td>
+                        <td><%= user.email %></td>
+                        <td>
+                            <a href="/userprofileupdate/<%= user._id %>">Edit Profile</a>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+        <a href="/dashboard" class="back-link">Back to Dashboard</a>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

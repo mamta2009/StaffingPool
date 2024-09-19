@@ -433,6 +433,205 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
 });
 
 // GET route for user profile update
+app.get('/userprofileupdate/:id?', checkAuth, async (req, res) => {
+    try {
+        let user;
+        if (req.params.id) {
+            // If an ID is provided, fetch that specific user
+            user = await User.findById(req.params.id);
+            if (!user) {
+                return res.status(404).send('User not found');
+            }
+        } else {
+            // If no ID is provided, use the logged-in user's data
+            user = req.session.user;
+        }
+        res.render('userprofileupdate', { user: user });
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        res.status(500).send('Error fetching user data');
+    }
+});
+
+// POST route for user profile update
+app.post('/userprofileupdate/:id?', checkAuth, async (req, res) => {
+    try {
+        let user;
+        if (req.params.id) {
+            // If an ID is provided, update that specific user
+            user = await User.findById(req.params.id);
+            if (!user) {
+                return res.status(404).send('User not found');
+            }
+        } else {
+            // If no ID is provided, update the logged-in user's data
+            user = await User.findById(req.session.user._id);
+        }
+
+        // Update user fields
+        user.firstName = req.body.firstName;
+        user.lastName = req.body.lastName;
+        user.email = req.body.email;
+        // ... update other fields as necessary ...
+
+        await user.save();
+
+        // Update session data if it's the logged-in user
+        if (!req.params.id || req.params.id === req.session.user._id.toString()) {
+            req.session.user = user;
+        }
+
+        res.redirect('/dashboard');
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        res.status(500).send('Error updating user profile');
+    }
+});
+
+// Start the server
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
+
+// POST route for registration
+app.post('/register', async (req, res) => {
+    try {
+        const { firstName, lastName, email, password, confirmPassword } = req.body;
+        console.log('Registration attempt for:', email);
+
+        if (password !== confirmPassword) {
+            return res.render('register', { 
+                error: 'Passwords do not match', 
+                firstName, 
+                lastName, 
+                email 
+            });
+        }
+
+        let users = [];
+        try {
+            users = await readUsersFromCsv();
+        } catch (error) {
+            console.error('Error reading users CSV:', error);
+            // If the file doesn't exist or is empty, we'll start with an empty array
+        }
+
+        console.log('Current users count:', users.length);
+
+        if (users.some(user => user.email === email)) {
+            return res.render('register', { 
+                error: 'Email already registered', 
+                firstName, 
+                lastName, 
+                email 
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = {
+            id: crypto.randomUUID(),
+            firstName,
+            lastName,
+            email,
+            password: hashedPassword,
+            role: 'User',
+            company: 'IA',
+            managerId: '',
+            supervisorId: ''
+        };
+
+        users.push(newUser);
+        await writeUsersToCsv(users);
+
+        console.log('New user registered:', email);
+        console.log('Updated users count:', users.length);
+
+        res.redirect('/login');
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).render('register', { 
+            error: 'An error occurred during registration', 
+            firstName: req.body.firstName, 
+            lastName: req.body.lastName, 
+            email: req.body.email 
+        });
+    }
+});
+
+// Middleware to check if user is logged in
+function checkAuth(req, res, next) {
+    if (!req.session.user) {
+        return res.redirect('/login');
+    }
+    next();
+}
+
+// Middleware to check roles
+function checkAdmin(req, res, next) {
+    if (req.session.user && req.session.user.role === 'Admin') {
+        next();
+    } else {
+        res.status(403).send('Access denied. Admin rights required.');
+    }
+}
+
+function checkManagerOrAbove(req, res, next) {
+    if (req.session.user && ['Admin', 'Manager'].includes(req.session.user.role)) {
+        next();
+    } else {
+        res.status(403).send('Access denied. Manager rights or above required.');
+    }
+}
+
+function checkSystemAdmin(req, res, next) {
+    console.log('User session:', req.session.user);
+    if (req.session.user && req.session.user.role === 'System Admin') {
+        next();
+    } else {
+        res.status(403).send('Access denied. System Admin rights required.');
+    }
+}
+
+// Dashboard route
+app.get('/dashboard', checkAuth, async (req, res) => {
+    try {
+        const uploads = await readUploadsFromCsv();
+        res.render('dashboard', { user: req.session.user, files: uploads });
+    } catch (error) {
+        console.error('Error reading uploads:', error);
+        res.status(500).send('Error reading uploads');
+    }
+});
+
+// POST route for file upload
+app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
+    try {
+        const { fileType, fileDescription } = req.body;
+        const uploads = await readUploadsFromCsv();
+
+        for (const file of req.files) {
+            const newUpload = {
+                ID: crypto.randomUUID(),
+                Filename: file.filename,
+                OriginalName: file.originalname,
+                UploadDate: new Date().toLocaleString(),
+                UploadedBy: req.session.user.email,
+                FileType: fileType,
+                Description: fileDescription
+            };
+            uploads.push(newUpload);
+        }
+
+        await writeUploadsToCsv(uploads);
+        res.redirect('/dashboard');
+    } catch (error) {
+        console.error('Error during file upload:', error);
+        res.status(500).send('An error occurred during file upload');
+    }
+});
+
+// GET route for user profile update
 app.get('/userprofileupdate', checkAuth, (req, res) => {
     res.render('userprofileupdate', { user: req.session.user });
 });
@@ -747,10 +946,6 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
 
 app.get('/check-session', (req, res) => {
     res.json(req.session.user || { message: 'Not logged in' });
