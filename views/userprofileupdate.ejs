@@ -6,79 +6,61 @@
     <title>Update User Profile</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+            font-family: Arial, sans-serif;
             background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         h1 {
             color: #333;
             text-align: center;
-            margin-bottom: 20px;
         }
-        .nav {
-            background-color: #007BFF;
-            overflow: hidden;
-            margin-bottom: 20px;
-            border-radius: 5px;
+        form {
+            display: grid;
+            gap: 15px;
         }
-        .nav a, .nav button {
-            float: left;
-            display: block;
-            color: white;
-            text-align: center;
-            padding: 14px 16px;
-            text-decoration: none;
-            border: none;
-            background: none;
-            cursor: pointer;
-        }
-        .nav a:hover, .nav button:hover {
-            background-color: #0056b3;
-        }
-        .content {
-            margin-top: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
+        label {
+            font-weight: bold;
             color: #555;
         }
-        .form-group input {
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 5px;
         }
-        .submit-btn {
-            background-color: #28a745;
+        button {
+            background-color: #4CAF50;
             color: white;
-            padding: 10px 20px;
+            padding: 10px 15px;
             border: none;
+            border-radius: 4px;
             cursor: pointer;
-            border-radius: 5px;
+            font-size: 16px;
         }
-        .submit-btn:hover {
-            background-color: #218838;
+        button:hover {
+            background-color: #45a049;
         }
-        .hidden-upload-form {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            text-decoration: none;
         }
-        #file-upload-input {
-            display: none;
+        .back-link:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -95,32 +77,16 @@
             <label for="email">Email:</label>
             <input type="email" id="email" name="email" value="<%= user.email %>" required>
 
-            <!-- Add other fields as necessary -->
+            <label for="password">New Password (leave blank to keep current):</label>
+            <input type="password" id="password" name="password">
+
+            <label for="confirmPassword">Confirm New Password:</label>
+            <input type="password" id="confirmPassword" name="confirmPassword">
 
             <button type="submit">Update Profile</button>
         </form>
         <a href="/dashboard" class="back-link">Back to Dashboard</a>
     </div>
-    <form id="upload-form" class="hidden-upload-form" action="/upload" method="POST" enctype="multipart/form-data">
-        <h2>Upload Files</h2>
-        <input type="file" name="files" multiple required>
-        <select name="fileType" required>
-            <option value="resume">Resume</option>
-            <option value="job_description">Job Description</option>
-        </select>
-        <input type="text" name="fileDescription" placeholder="Enter file description">
-        <button type="submit">Upload</button>
-        <button type="button" onclick="hideUploadForm()">Cancel</button>
-    </form>
-    <script>
-        function showUploadForm() {
-            document.getElementById('upload-form').style.display = 'block';
-        }
-
-        function hideUploadForm() {
-            document.getElementById('upload-form').style.display = 'none';
-        }
-    </script>
 </body>
 </html>
 
