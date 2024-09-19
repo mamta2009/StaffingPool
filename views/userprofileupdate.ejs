@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Profile</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav {
+            background-color: #007BFF;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .nav a, .nav button {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .nav a:hover, .nav button:hover {
+            background-color: #0056b3;
+        }
+        .content {
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .submit-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .submit-btn:hover {
+            background-color: #218838;
+        }
+        .hidden-upload-form {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #file-upload-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <button onclick="showUploadForm()">Upload Files</button>
+        <a href="/userprofileupdate">Update Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+    <div class="content">
+        <h1>Update Profile</h1>
+        <form action="/userprofileupdate" method="POST">
+            <div class="form-group">
+                <label for="firstName">First Name</label>
+                <input type="text" id="firstName" name="firstName" value="<%= user.firstName %>" required>
+            </div>
+            <div class="form-group">
+                <label for="lastName">Last Name</label>
+                <input type="text" id="lastName" name="lastName" value="<%= user.lastName %>" required>
+            </div>
+            <div class="form-group">
+                <label for="mobileNumber">Mobile Number</label>
+                <input type="text" id="mobileNumber" name="mobileNumber" value="<%= user.mobileNumber %>" required>
+            </div>
+            <div class="form-group">
+                <label for="country">Country</label>
+                <input type="text" id="country" name="country" value="<%= user.country %>" required>
+            </div>
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" value="<%= user.city %>" required>
+            </div>
+            <div class="form-group">
+                <label for="state">State</label>
+                <input type="text" id="state" name="state" value="<%= user.state %>" required>
+            </div>
+            <div class="form-group">
+                <label for="zipCode">Zip Code</label>
+                <input type="text" id="zipCode" name="zipCode" value="<%= user.zipCode %>" required>
+            </div>
+            <button type="submit" class="submit-btn">Update Profile</button>
+        </form>
+    </div>
+    <form id="upload-form" class="hidden-upload-form" action="/upload" method="POST" enctype="multipart/form-data">
+        <h2>Upload Files</h2>
+        <input type="file" name="files" multiple required>
+        <select name="fileType" required>
+            <option value="resume">Resume</option>
+            <option value="job_description">Job Description</option>
+        </select>
+        <input type="text" name="fileDescription" placeholder="Enter file description">
+        <button type="submit">Upload</button>
+        <button type="button" onclick="hideUploadForm()">Cancel</button>
+    </form>
+    <script>
+        function showUploadForm() {
+            document.getElementById('upload-form').style.display = 'block';
+        }
+
+        function hideUploadForm() {
+            document.getElementById('upload-form').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav {
+            background-color: #007BFF;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .nav a, .nav button {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        .nav a:hover, .nav button:hover {
+            background-color: #0056b3;
+        }
+        .content {
+            margin-top: 20px;
+        }
+        .file-list table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .file-list th, .file-list td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .file-list th {
+            background-color: #007BFF;
+            color: white;
+        }
+        .file-list tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .delete-btn, .match-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .delete-btn:hover, .match-btn:hover {
+            background-color: #c82333;
+        }
+        .export-btn {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .export-btn:hover {
+            background-color: #138496;
+        }
+        .hidden-upload-form {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #file-upload-input {
+            display: none;
+        }
+        .clear-uploads-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .clear-uploads-btn:hover {
+            background-color: #c82333;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <button onclick="showUploadForm()">Upload Files</button>
+        <a href="/userprofileupdate">Update Profile</a>
+        <button class="clear-btn" onclick="confirmClearUploads()">Clear All Uploads</button>
+        <a href="/user-list" class="nav-btn">User List</a>
+        <a href="/logout">Logout</a>
+    </div>
+    <div class="content">
+        <h1>Welcome, <%= user.firstName %> <%= user.lastName %></h1>
+        <div class="file-list">
+            <h2>List of files uploaded</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>File Type</th>
+                        <th>Description</th>
+                        <th>Date Uploaded</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% files.forEach(file => { %>
+                        <tr>
+                            <td><%= file.OriginalName %></td>
+                            <td><%= file.FileType %></td>
+                            <td><%= file.Description || 'No description' %></td>
+                            <td><%= new Date(file.UploadDate).toLocaleString() %></td>
+                            <td>
+                                <form id="delete-form-<%= file.Filename %>" action="/deletefile" method="POST" style="display:inline;">
+                                    <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                    <button type="button" class="delete-btn" onclick="confirmDelete('<%= file.Filename %>', '<%= file.OriginalName %>')">Delete</button>
+                                </form>
+                                <form action="/matchjob" method="POST" style="display:inline;">
+                                    <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                    <button type="submit" class="match-btn">Match with Job Description</button>
+                                </form>
+                                <% if (!file.Description) { %>
+                                    <form action="/adddescription" method="POST" style="display:inline;">
+                                        <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                        <input type="text" name="fileDescription" placeholder="Add description">
+                                        <button type="submit" class="match-btn">Add</button>
+                                    </form>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+        <div class="export-form">
+            <h2>Export Files</h2>
+            <form action="/exportfiles" method="POST">
+                <button type="submit" class="export-btn">Export All Files</button>
+            </form>
+        </div>
+    </div>
+    <form id="upload-form" class="hidden-upload-form" action="/upload" method="POST" enctype="multipart/form-data">
+        <h2>Upload Files</h2>
+        <input type="file" name="files" multiple required>
+        <select name="fileType" required>
+            <option value="resume">Resume</option>
+            <option value="job_description">Job Description</option>
+        </select>
+        <input type="text" name="fileDescription" placeholder="Enter file description">
+        <button type="submit">Upload</button>
+        <button type="button" onclick="hideUploadForm()">Cancel</button>
+    </form>
+    <script>
+        function confirmDelete(fileName, originalName) {
+            if (confirm(`Are you sure you want to delete ${originalName}?`)) {
+                document.getElementById(`delete-form-${fileName}`).submit();
+            }
+        }
+
+        function showUploadForm() {
+            document.getElementById('upload-form').style.display = 'block';
+        }
+
+        function hideUploadForm() {
+            document.getElementById('upload-form').style.display = 'none';
+        }
+
+        function confirmClearUploads() {
+            if (confirm('Do you really want to clear all uploads? This action cannot be undone.')) {
+                fetch('/clear-uploads', { method: 'GET' })
+                    .then(response => response.text())
+                    .then(message => {
+                        alert(message);
+                        location.reload(); // Reload the page to reflect the changes
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while clearing uploads.');
+                    });
+            }
+        }
+
+        function confirmClearUsers() {
+            if (confirm('Do you really want to clear all user information? This action cannot be undone.')) {
+                fetch('/clear-users', { method: 'GET' })
+                    .then(response => response.text())
+                    .then(message => {
+                        alert(message);
+                        window.location.href = '/login'; // Redirect to login page after clearing users
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while clearing user information.');
+                    });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - User Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .no-users {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .archive {
+            background-color: #ffc107;
+        }
+        .archive:hover {
+            background-color: #d39e00;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard - User Management</h1>
+    <input type="text" id="searchInput" placeholder="Search by email...">
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Registration Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="userList">
+            <!-- User data will be inserted here -->
+        </tbody>
+    </table>
+
+    <!-- Edit User Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Edit User</h2>
+            <form id="editForm">
+                <input type="hidden" id="editEmail">
+                <label for="editNewEmail">New Email:</label>
+                <input type="email" id="editNewEmail" required><br><br>
+                <button type="submit" class="button">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Change Password</h2>
+            <form id="passwordForm">
+                <input type="hidden" id="passwordEmail">
+                <label for="newPassword">New Password:</label>
+                <input type="password" id="newPassword" required><br><br>
+                <button type="submit" class="button">Change Password</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let users = [];
+
+        function loadUsers() {
+            fetch('/admin/users')
+                .then(response => response.json())
+                .then(data => {
+                    users = data;
+                    displayUsers(users);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    const userList = document.getElementById('userList');
+                    userList.innerHTML = '<tr><td colspan="4" class="no-users">Error loading user data.</td></tr>';
+                });
+        }
+
+        function displayUsers(usersToDisplay) {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            if (usersToDisplay.length === 0) {
+                userList.innerHTML = '<tr><td colspan="4" class="no-users">No users found.</td></tr>';
+            } else {
+                usersToDisplay.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.email}</td>
+                        <td>${new Date(user.registrationDate).toLocaleString()}</td>
+                        <td>${user.archived ? 'Archived' : 'Active'}</td>
+                        <td>
+                            <button class="button" onclick="editUser('${user.email}')">Edit</button>
+                            <button class="button" onclick="changePassword('${user.email}')">Change Password</button>
+                            <button class="button archive" onclick="toggleArchive('${user.email}')">${user.archived ? 'Unarchive' : 'Archive'}</button>
+                        </td>
+                    `;
+                    userList.appendChild(row);
+                });
+            }
+        }
+
+        function editUser(email) {
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editNewEmail').value = email;
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function changePassword(email) {
+            document.getElementById('passwordEmail').value = email;
+            document.getElementById('passwordModal').style.display = 'block';
+        }
+
+        function toggleArchive(email) {
+            fetch(`/admin/users/${email}/toggle-archive`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadUsers();
+                    } else {
+                        alert('Failed to toggle archive status');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while toggling archive status');
+                });
+        }
+
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const oldEmail = document.getElementById('editEmail').value;
+            const newEmail = document.getElementById('editNewEmail').value;
+            fetch(`/admin/users/${oldEmail}/edit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ newEmail: newEmail }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadUsers();
+                    document.getElementById('editModal').style.display = 'none';
+                } else {
+                    alert('Failed to edit user');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while editing the user');
+            });
+        });
+
+        document.getElementById('passwordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('passwordEmail').value;
+            const newPassword = document.getElementById('newPassword').value;
+            fetch(`/admin/users/${email}/change-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ newPassword: newPassword }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('passwordModal').style.display = 'none';
+                    alert('Password changed successfully');
+                } else {
+                    alert('Failed to change password');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while changing the password');
+            });
+        });
+
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.onclick = function() {
+                this.closest('.modal').style.display = 'none';
+            }
+        });
+
+        window.onclick = function(event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredUsers = users.filter(user => 
+                user.email.toLowerCase().includes(searchTerm)
+            );
+            displayUsers(filteredUsers);
+        });
+
+        loadUsers();
+    </script>
+</body>
+</html>

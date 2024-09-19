@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resolve Duplicate Files</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .duplicate-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .radio-group {
+            margin-top: 10px;
+        }
+        .submit-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+        .error-message {
+            color: #ff0000;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Resolve Duplicate Files</h1>
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="error-message"><%= error %></div>
+    <% } %>
+    <% if (typeof duplicates !== 'undefined' && duplicates && duplicates.length > 0) { %>
+        <form action="/resolve-duplicates" method="POST">
+            <% duplicates.forEach((duplicate, index) => { %>
+                <div class="duplicate-item">
+                    <div class="file-name"><%= duplicate.newFile.originalname %></div>
+                    <div>Existing file uploaded on: <%= new Date(duplicate.existingFile.uploadDate).toLocaleString() %></div>
+                    <div class="radio-group">
+                        <input type="radio" id="keep-both-<%= index %>" name="file-<%= index %>" value="keep-both" required>
+                        <label for="keep-both-<%= index %>">Keep both files</label><br>
+                        <input type="radio" id="replace-<%= index %>" name="file-<%= index %>" value="replace">
+                        <label for="replace-<%= index %>">Replace old file with new file</label><br>
+                        <input type="radio" id="keep-old-<%= index %>" name="file-<%= index %>" value="keep-old">
+                        <label for="keep-old-<%= index %>">Keep old file (discard new file)</label>
+                    </div>
+                </div>
+            <% }) %>
+            <button type="submit" class="submit-btn">Submit</button>
+        </form>
+    <% } else { %>
+        <p>No duplicate files to resolve.</p>
+    <% } %>
+    <p><a href="/files">Back to file list</a></p>
+</body>
+</html>

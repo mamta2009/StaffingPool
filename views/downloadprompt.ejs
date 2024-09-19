@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Exported Files</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .file-list {
+            margin-top: 20px;
+        }
+        .file-list table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .file-list th, .file-list td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .file-list th {
+            background-color: #f4f4f4;
+        }
+        .download-btn, .cancel-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .download-btn:hover, .cancel-btn:hover {
+            background-color: #45a049;
+        }
+        .cancel-btn {
+            background-color: #f44336;
+        }
+        .cancel-btn:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <h1>Exported Files</h1>
+    <div class="file-list">
+        <h2>Your Exported Files</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% userFiles.forEach(file => { %>
+                    <tr>
+                        <td><%= file %></td>
+                        <td>
+                            <a href="/downloadexportedfile/<%= file %>" class="download-btn">Download</a>
+                        </td>
+                    </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+    <form action="/cancelDownload" method="POST">
+        <button type="submit" class="cancel-btn">Cancel</button>
+    </form>
+</body>
+</html>
