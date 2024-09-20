@@ -62,26 +62,96 @@
         .back-link:hover {
             text-decoration: underline;
         }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .address-fields {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: 1fr 1fr;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Update User Profile</h1>
         <form action="/userprofileupdate/<%= user._id %>" method="POST">
-            <label for="firstName">First Name:</label>
-            <input type="text" id="firstName" name="firstName" value="<%= user.firstName %>" required>
+            <div class="form-group">
+                <label for="firstName">First Name:</label>
+                <input type="text" id="firstName" name="firstName" value="<%= user.firstName %>" required>
+            </div>
 
-            <label for="lastName">Last Name:</label>
-            <input type="text" id="lastName" name="lastName" value="<%= user.lastName %>" required>
+            <div class="form-group">
+                <label for="lastName">Last Name:</label>
+                <input type="text" id="lastName" name="lastName" value="<%= user.lastName %>" required>
+            </div>
 
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" value="<%= user.email %>" required>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="<%= user.email %>" required>
+            </div>
 
-            <label for="password">New Password (leave blank to keep current):</label>
-            <input type="password" id="password" name="password">
+            <div class="form-group">
+                <label for="mobileNumber">Mobile Number:</label>
+                <input type="tel" id="mobileNumber" name="mobileNumber" value="<%= user.mobileNumber || '' %>">
+            </div>
 
-            <label for="confirmPassword">Confirm New Password:</label>
-            <input type="password" id="confirmPassword" name="confirmPassword">
+            <div class="form-group">
+                <label for="isUSA">Country:</label>
+                <select id="isUSA" name="isUSA">
+                    <option value="true" <%= user.isUSA ? 'selected' : '' %>>USA</option>
+                    <option value="false" <%= !user.isUSA ? 'selected' : '' %>>Outside USA</option>
+                </select>
+            </div>
+
+            <div class="address-fields">
+                <div class="form-group">
+                    <label for="street">Street:</label>
+                    <input type="text" id="street" name="address[street]" value="<%= user.address?.street || '' %>">
+                </div>
+
+                <div class="form-group">
+                    <label for="city">City:</label>
+                    <input type="text" id="city" name="address[city]" value="<%= user.address?.city || '' %>">
+                </div>
+
+                <div class="form-group">
+                    <label for="state">State:</label>
+                    <input type="text" id="state" name="address[state]" value="<%= user.address?.state || '' %>">
+                </div>
+
+                <div class="form-group">
+                    <label for="zipCode">Zip Code:</label>
+                    <input type="text" id="zipCode" name="address[zipCode]" value="<%= user.address?.zipCode || '' %>">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="country">Country:</label>
+                <input type="text" id="country" name="address[country]" value="<%= user.address?.country || '' %>">
+            </div>
+
+            <div class="form-group">
+                <label for="password">New Password (leave blank to keep current):</label>
+                <input type="password" id="password" name="password">
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm New Password:</label>
+                <input type="password" id="confirmPassword" name="confirmPassword">
+            </div>
 
             <button type="submit">Update Profile</button>
         </form>

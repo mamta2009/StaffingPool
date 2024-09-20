@@ -1,2 +1,4 @@
-ID,First Name,Last Name,Email,Password,Role,Company,Manager ID,Supervisor ID
-11b7e19e-8fef-4d1d-8058-c4ee22a5dcce,Mamta,Sonwalkar,mamtasonwalkar@gmail.com,$2b$10$tJPCBd.5CdB/UlMbDaNWme.E3u8vv0ZJhBij6nqrfH0U.7OAz.34e,User,IA,,
+ID,First Name,Last Name,Email,Password,Role,Company,Manager ID,Supervisor ID,Mobile Number,Street,City,State,Zip Code,Country,isUSA
+,,,,,,,,,,,,,,,false
+,,,,,,,,,,,,,,,false
+2b5ceb00-9cfd-4a71-abc9-9b127af04e07,kk,AA,baibhavthapa@icloud.com,$2b$10$kdJmL6V0OiTLZxJZJcTe3uZtsgLRXzCU9bnZSBa4iiIF/Q/l1281u,User,IA,,,,,,,,,false

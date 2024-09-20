@@ -2,13 +2,14 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const multer = require('multer');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const http = require('http');
+const User = require('./models/User');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -24,38 +25,23 @@ app.use(session({
 
 // Set view engine to EJS
 app.set('view engine', 'ejs');
-
-// Ensure the views directory is correctly set up
 app.set('views', path.join(__dirname, 'views'));
 
 // Path to user profile CSV
-const userProfileFilePath = '/Users/mamtasonwalkarm2/StaffingPool/userprofile.csv';
+const userProfileFilePath = path.join(__dirname, 'data', 'userprofile.csv');
 console.log('User profile file path:', userProfileFilePath);
 const resumeUploadCsvPath = path.join(__dirname, 'resumeupload.csv');
 const resumeContactsCsvPath = path.join(__dirname, 'Resumencontacts.csv');
 const uploadsDir = path.join(__dirname, 'uploads');
 const exportDir = path.join(__dirname, 'exports');
 
-// Ensure the export directory exists
-async function ensureExportDirExists() {
+// Ensure directories exist
+async function ensureDirExists(dir) {
     try {
-        await fs.access(exportDir);
+        await fs.access(dir);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            await fs.mkdir(exportDir, { recursive: true });
-        } else {
-            throw error;
-        }
-    }
-}
-
-// Ensure the uploads directory exists
-async function ensureUploadsDirExists() {
-    try {
-        await fs.access(uploadsDir);
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            await fs.mkdir(uploadsDir, { recursive: true });
+            await fs.mkdir(dir, { recursive: true });
         } else {
             throw error;
         }
@@ -65,7 +51,7 @@ async function ensureUploadsDirExists() {
 // Set up multer storage
 const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
-        await ensureUploadsDirExists();
+        await ensureDirExists(uploadsDir);
         cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
@@ -76,37 +62,26 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Helper function to read users from CSV
-function readUsersFromCsv() {
+// Helper functions
+async function readUsersFromCsv() {
+    const users = [];
+    const fileContent = await fs.readFile(userProfileFilePath, 'utf8');
     return new Promise((resolve, reject) => {
-        const users = [];
-        fs.createReadStream(userProfileFilePath)
-            .pipe(csv({
-                mapHeaders: ({ header }) => {
-                    switch (header) {
-                        case 'ID': return 'id';
-                        case 'First Name': return 'firstName';
-                        case 'Last Name': return 'lastName';
-                        case 'Email': return 'email';
-                        case 'Password': return 'password';
-                        case 'Role': return 'role';
-                        case 'Company': return 'company';
-                        case 'Manager ID': return 'managerId';
-                        case 'Supervisor ID': return 'supervisorId';
-                        default: return header;
-                    }
-                }
-            }))
+        const stream = require('stream');
+        const bufferStream = new stream.PassThrough();
+        bufferStream.end(fileContent);
+
+        bufferStream
+            .pipe(csv())
             .on('data', (row) => {
-                if (row.email) {
+                // Only add rows with non-empty email addresses
+                if (row.Email && row.Email.trim() !== '') {
+                    row.isUSA = row.isUSA.toLowerCase() === 'true';
                     users.push(row);
-                } else {
-                    console.warn('Skipping invalid user entry:', row);
                 }
             })
             .on('end', () => {
                 console.log('CSV file successfully processed');
-                console.log('Valid users read from CSV:', users.length);
                 resolve(users);
             })
             .on('error', (error) => {
@@ -116,7 +91,6 @@ function readUsersFromCsv() {
     });
 }
 
-// Helper function to write users to CSV
 async function writeUsersToCsv(users) {
     const csvWriter = createCsvWriter({
         path: userProfileFilePath,
@@ -129,7 +103,14 @@ async function writeUsersToCsv(users) {
             {id: 'role', title: 'Role'},
             {id: 'company', title: 'Company'},
             {id: 'managerId', title: 'Manager ID'},
-            {id: 'supervisorId', title: 'Supervisor ID'}
+            {id: 'supervisorId', title: 'Supervisor ID'},
+            {id: 'mobileNumber', title: 'Mobile Number'},
+            {id: 'street', title: 'Street'},
+            {id: 'city', title: 'City'},
+            {id: 'state', title: 'State'},
+            {id: 'zipCode', title: 'Zip Code'},
+            {id: 'country', title: 'Country'},
+            {id: 'isUSA', title: 'isUSA'}
         ]
     });
 
@@ -142,33 +123,41 @@ async function writeUsersToCsv(users) {
     }
 }
 
-// Helper function to read uploads from CSV
-function readUploadsFromCsv() {
-    return new Promise((resolve, reject) => {
-        const uploads = [];
-        fs.createReadStream(resumeUploadCsvPath)
-            .pipe(csv())
-            .on('data', (row) => {
-                uploads.push({
-                    ID: row.ID,
-                    Filename: row.Filename,
-                    OriginalName: row['Original Name'],
-                    UploadDate: row['Upload Date'],
-                    UploadedBy: row['Uploaded By'],
-                    FileType: row['File Type'],
-                    Description: row.Description
+async function readUploadsFromCsv() {
+    const uploads = [];
+    try {
+        const fileContent = await fs.readFile(resumeUploadCsvPath, 'utf8');
+        return new Promise((resolve, reject) => {
+            const stream = require('stream');
+            const bufferStream = new stream.PassThrough();
+            bufferStream.end(fileContent);
+
+            bufferStream
+                .pipe(csv())
+                .on('data', (row) => {
+                    uploads.push({
+                        ID: row.ID,
+                        Filename: row.Filename,
+                        OriginalName: row['Original Name'],
+                        UploadDate: row['Upload Date'],
+                        UploadedBy: row['Uploaded By'],
+                        FileType: row['File Type'],
+                        Description: row.Description
+                    });
+                })
+                .on('end', () => {
+                    resolve(uploads);
+                })
+                .on('error', (error) => {
+                    reject(error);
                 });
-            })
-            .on('end', () => {
-                resolve(uploads);
-            })
-            .on('error', (error) => {
-                reject(error);
-            });
-    });
+        });
+    } catch (error) {
+        console.error('Error reading uploads CSV:', error);
+        throw error;
+    }
 }
 
-// Helper function to write uploads to CSV
 async function writeUploadsToCsv(uploads) {
     const csvWriter = createCsvWriter({
         path: resumeUploadCsvPath,
@@ -186,39 +175,40 @@ async function writeUploadsToCsv(uploads) {
     await csvWriter.writeRecords(uploads);
 }
 
-// Function to clear resume upload CSV
-function clearResumeUploadCsv() {
-    const header = 'ID,Filename,Original Name,Upload Date,Uploaded By,File Type,Description\n';
-    fs.writeFileSync(resumeUploadCsvPath, header, 'utf8');
-    console.log('resumeupload.csv has been cleared and reset with header.');
-
-    // Clear uploads directory
-    fs.readdirSync(uploadsDir).forEach((file) => {
-        const filePath = path.join(uploadsDir, file);
-        fs.unlinkSync(filePath);
-    });
-    console.log('uploads directory has been cleared.');
-}
-
-// POST route for adding description
-app.post('/adddescription', async (req, res) => {
+// Middleware
+function checkAuth(req, res, next) {
     if (!req.session.user) {
         return res.redirect('/login');
     }
+    next();
+}
 
-    const { fileName, fileDescription } = req.body;
-    const uploads = await readUploadsFromCsv();
-    const file = uploads.find(file => file.Filename === fileName);
-
-    if (file) {
-        file.Description = fileDescription;
-        await writeUploadsToCsv(uploads);
+function checkAdmin(req, res, next) {
+    if (req.session.user && req.session.user.role === 'Admin') {
+        next();
+    } else {
+        res.status(403).send('Access denied. Admin rights required.');
     }
+}
 
-    res.redirect('/dashboard');
-});
+function checkManagerOrAbove(req, res, next) {
+    if (req.session.user && ['Admin', 'Manager'].includes(req.session.user.role)) {
+        next();
+    } else {
+        res.status(403).send('Access denied. Manager rights or above required.');
+    }
+}
 
-// GET route for login
+function checkSystemAdmin(req, res, next) {
+    console.log('User session:', req.session.user);
+    if (req.session.user && req.session.user.role === 'System Admin') {
+        next();
+    } else {
+        res.status(403).send('Access denied. System Admin rights required.');
+    }
+}
+
+// Routes
 app.get('/login', (req, res) => {
     res.render('login', {
         error: null,
@@ -228,7 +218,6 @@ app.get('/login', (req, res) => {
     });
 });
 
-// POST route for login
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -237,10 +226,10 @@ app.post('/login', async (req, res) => {
         const users = await readUsersFromCsv();
         console.log('Users read from CSV:', users.length);
 
-        const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+        const user = users.find(u => u.Email && u.Email.toLowerCase() === email.toLowerCase());
         console.log('User found:', user ? 'Yes' : 'No');
         if (user) {
-            console.log('User details:', { ...user, password: '[REDACTED]' });
+            console.log('User details:', { ...user, Password: '[REDACTED]' });
         }
 
         if (!user) {
@@ -253,19 +242,19 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        const passwordMatch = await bcrypt.compare(password, user.password);
+        const passwordMatch = await bcrypt.compare(password, user.Password);
         console.log('Password match:', passwordMatch);
 
         if (passwordMatch) {
             req.session.user = {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                company: user.company,
-                managerId: user.managerId,
-                supervisorId: user.supervisorId
+                id: user.ID,
+                email: user.Email,
+                role: user.Role,
+                firstName: user['First Name'],
+                lastName: user['Last Name'],
+                company: user.Company,
+                managerId: user['Manager ID'],
+                supervisorId: user['Supervisor ID']
             };
             req.session.loginAttempts = 0;
             console.log('Login successful, redirecting to dashboard');
@@ -290,12 +279,10 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// GET route for registration
 app.get('/register', (req, res) => {
     res.render('register', { error: null, email: req.query.email || '' });
 });
 
-// POST route for registration
 app.post('/register', async (req, res) => {
     try {
         const { firstName, lastName, email, password, confirmPassword } = req.body;
@@ -310,17 +297,10 @@ app.post('/register', async (req, res) => {
             });
         }
 
-        let users = [];
-        try {
-            users = await readUsersFromCsv();
-        } catch (error) {
-            console.error('Error reading users CSV:', error);
-            // If the file doesn't exist or is empty, we'll start with an empty array
-        }
-
+        let users = await readUsersFromCsv();
         console.log('Current users count:', users.length);
 
-        if (users.some(user => user.email === email)) {
+        if (users.some(user => user.Email === email)) {
             return res.render('register', { 
                 error: 'Email already registered', 
                 firstName, 
@@ -331,15 +311,22 @@ app.post('/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = {
-            id: crypto.randomUUID(),
-            firstName,
-            lastName,
-            email,
-            password: hashedPassword,
-            role: 'User',
-            company: 'IA',
-            managerId: '',
-            supervisorId: ''
+            ID: crypto.randomUUID(),
+            'First Name': firstName,
+            'Last Name': lastName,
+            Email: email,
+            Password: hashedPassword,
+            Role: 'User',
+            Company: 'IA',
+            'Manager ID': '',
+            'Supervisor ID': '',
+            'Mobile Number': '',
+            Street: '',
+            City: '',
+            State: '',
+            'Zip Code': '',
+            Country: '',
+            isUSA: 'false'
         };
 
         users.push(newUser);
@@ -360,41 +347,6 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Middleware to check if user is logged in
-function checkAuth(req, res, next) {
-    if (!req.session.user) {
-        return res.redirect('/login');
-    }
-    next();
-}
-
-// Middleware to check roles
-function checkAdmin(req, res, next) {
-    if (req.session.user && req.session.user.role === 'Admin') {
-        next();
-    } else {
-        res.status(403).send('Access denied. Admin rights required.');
-    }
-}
-
-function checkManagerOrAbove(req, res, next) {
-    if (req.session.user && ['Admin', 'Manager'].includes(req.session.user.role)) {
-        next();
-    } else {
-        res.status(403).send('Access denied. Manager rights or above required.');
-    }
-}
-
-function checkSystemAdmin(req, res, next) {
-    console.log('User session:', req.session.user);
-    if (req.session.user && req.session.user.role === 'System Admin') {
-        next();
-    } else {
-        res.status(403).send('Access denied. System Admin rights required.');
-    }
-}
-
-// Dashboard route
 app.get('/dashboard', checkAuth, async (req, res) => {
     try {
         const uploads = await readUploadsFromCsv();
@@ -405,7 +357,6 @@ app.get('/dashboard', checkAuth, async (req, res) => {
     }
 });
 
-// POST route for file upload
 app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
     try {
         const { fileType, fileDescription } = req.body;
@@ -415,10 +366,10 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
             const newUpload = {
                 ID: crypto.randomUUID(),
                 Filename: file.filename,
-                OriginalName: file.originalname,
-                UploadDate: new Date().toLocaleString(),
-                UploadedBy: req.session.user.email,
-                FileType: fileType,
+                'Original Name': file.originalname,
+                'Upload Date': new Date().toLocaleString(),
+                'Uploaded By': req.session.user.email,
+                'File Type': fileType,
                 Description: fileDescription
             };
             uploads.push(newUpload);
@@ -432,18 +383,15 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
     }
 });
 
-// GET route for user profile update
 app.get('/userprofileupdate/:id?', checkAuth, async (req, res) => {
     try {
         let user;
         if (req.params.id) {
-            // If an ID is provided, fetch that specific user
             user = await User.findById(req.params.id);
             if (!user) {
                 return res.status(404).send('User not found');
             }
         } else {
-            // If no ID is provided, use the logged-in user's data
             user = req.session.user;
         }
         res.render('userprofileupdate', { user: user });
@@ -453,295 +401,75 @@ app.get('/userprofileupdate/:id?', checkAuth, async (req, res) => {
     }
 });
 
-// POST route for user profile update
 app.post('/userprofileupdate/:id?', checkAuth, async (req, res) => {
     try {
-        let user;
-        if (req.params.id) {
-            // If an ID is provided, update that specific user
-            user = await User.findById(req.params.id);
-            if (!user) {
-                return res.status(404).send('User not found');
-            }
-        } else {
-            // If no ID is provided, update the logged-in user's data
-            user = await User.findById(req.session.user._id);
+        console.log('Session user:', req.session.user);
+        console.log('Params id:', req.params.id);
+        
+        const userId = req.params.id || req.session.user.id;
+        console.log('User ID to update:', userId);
+        
+        let user = await User.findById(userId);
+        console.log('Found user:', user);
+
+        if (!user) {
+            console.log('User not found');
+            return res.status(404).send('User not found');
         }
 
         // Update user fields
-        user.firstName = req.body.firstName;
-        user.lastName = req.body.lastName;
-        user.email = req.body.email;
-        // ... update other fields as necessary ...
-
-        await user.save();
-
-        // Update session data if it's the logged-in user
-        if (!req.params.id || req.params.id === req.session.user._id.toString()) {
-            req.session.user = user;
-        }
-
-        res.redirect('/dashboard');
-    } catch (error) {
-        console.error('Error updating user profile:', error);
-        res.status(500).send('Error updating user profile');
-    }
-});
-
-// Start the server
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
-
-// POST route for registration
-app.post('/register', async (req, res) => {
-    try {
-        const { firstName, lastName, email, password, confirmPassword } = req.body;
-        console.log('Registration attempt for:', email);
-
-        if (password !== confirmPassword) {
-            return res.render('register', { 
-                error: 'Passwords do not match', 
-                firstName, 
-                lastName, 
-                email 
-            });
-        }
-
-        let users = [];
-        try {
-            users = await readUsersFromCsv();
-        } catch (error) {
-            console.error('Error reading users CSV:', error);
-            // If the file doesn't exist or is empty, we'll start with an empty array
-        }
-
-        console.log('Current users count:', users.length);
-
-        if (users.some(user => user.email === email)) {
-            return res.render('register', { 
-                error: 'Email already registered', 
-                firstName, 
-                lastName, 
-                email 
-            });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = {
-            id: crypto.randomUUID(),
-            firstName,
-            lastName,
-            email,
-            password: hashedPassword,
-            role: 'User',
-            company: 'IA',
-            managerId: '',
-            supervisorId: ''
+        const updatedUserData = {
+            id: user.id,
+            firstName: req.body.firstName || user.firstName,
+            lastName: req.body.lastName || user.lastName,
+            email: req.body.email || user.email,
+            password: user.password, // Keep the existing password if not changed
+            role: user.role,
+            company: user.company,
+            managerID: user.managerID,
+            supervisorID: user.supervisorID,
+            mobileNumber: req.body.mobileNumber || user.mobileNumber,
+            address: {
+                street: req.body.street || user.address.street,
+                city: req.body.city || user.address.city,
+                state: req.body.state || user.address.state,
+                zipCode: req.body.zipCode || user.address.zipCode,
+                country: req.body.country || user.address.country
+            },
+            isUSA: req.body.isUSA === 'true'
         };
 
-        users.push(newUser);
-        await writeUsersToCsv(users);
+        console.log('Updated user data:', updatedUserData);
 
-        console.log('New user registered:', email);
-        console.log('Updated users count:', users.length);
-
-        res.redirect('/login');
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).render('register', { 
-            error: 'An error occurred during registration', 
-            firstName: req.body.firstName, 
-            lastName: req.body.lastName, 
-            email: req.body.email 
-        });
-    }
-});
-
-// Middleware to check if user is logged in
-function checkAuth(req, res, next) {
-    if (!req.session.user) {
-        return res.redirect('/login');
-    }
-    next();
-}
-
-// Middleware to check roles
-function checkAdmin(req, res, next) {
-    if (req.session.user && req.session.user.role === 'Admin') {
-        next();
-    } else {
-        res.status(403).send('Access denied. Admin rights required.');
-    }
-}
-
-function checkManagerOrAbove(req, res, next) {
-    if (req.session.user && ['Admin', 'Manager'].includes(req.session.user.role)) {
-        next();
-    } else {
-        res.status(403).send('Access denied. Manager rights or above required.');
-    }
-}
-
-function checkSystemAdmin(req, res, next) {
-    console.log('User session:', req.session.user);
-    if (req.session.user && req.session.user.role === 'System Admin') {
-        next();
-    } else {
-        res.status(403).send('Access denied. System Admin rights required.');
-    }
-}
-
-// Dashboard route
-app.get('/dashboard', checkAuth, async (req, res) => {
-    try {
-        const uploads = await readUploadsFromCsv();
-        res.render('dashboard', { user: req.session.user, files: uploads });
-    } catch (error) {
-        console.error('Error reading uploads:', error);
-        res.status(500).send('Error reading uploads');
-    }
-});
-
-// POST route for file upload
-app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
-    try {
-        const { fileType, fileDescription } = req.body;
-        const uploads = await readUploadsFromCsv();
-
-        for (const file of req.files) {
-            const newUpload = {
-                ID: crypto.randomUUID(),
-                Filename: file.filename,
-                OriginalName: file.originalname,
-                UploadDate: new Date().toLocaleString(),
-                UploadedBy: req.session.user.email,
-                FileType: fileType,
-                Description: fileDescription
-            };
-            uploads.push(newUpload);
+        // Update password if provided
+        if (req.body.password && req.body.password === req.body.confirmPassword) {
+            updatedUserData.password = await bcrypt.hash(req.body.password, 10);
         }
 
-        await writeUploadsToCsv(uploads);
-        res.redirect('/dashboard');
-    } catch (error) {
-        console.error('Error during file upload:', error);
-        res.status(500).send('An error occurred during file upload');
-    }
-});
+        const updatedUser = await User.save(updatedUserData);
+        console.log('User after save:', updatedUser);
 
-// GET route for user profile update
-app.get('/userprofileupdate', checkAuth, (req, res) => {
-    res.render('userprofileupdate', { user: req.session.user });
-});
-
-// POST route for user profile update
-app.post('/userprofileupdate', checkAuth, async (req, res) => {
-    const { firstName, lastName, mobileNumber, country, city, state, zipCode } = req.body;
-    try {
-        const users = await readUsersFromCsv();
-        const userIndex = users.findIndex(u => u.email === req.session.user.email);
-
-        if (userIndex !== -1) {
-            users[userIndex] = {
-                ...users[userIndex],
-                firstName,
-                lastName,
-                mobileNumber,
-                country,
-                city,
-                state,
-                zipCode
-            };
-
-            await writeUsersToCsv(users);
-            req.session.user = users[userIndex];
-            res.redirect('/dashboard');
-        } else {
-            res.status(404).send('User not found');
+        // Update session data if it's the logged-in user
+        if (userId === req.session.user.id) {
+            req.session.user = updatedUser;
+            console.log('Updated session user:', req.session.user);
         }
+
+        res.redirect('/user-list');
     } catch (error) {
         console.error('Error updating user profile:', error);
-        res.status(500).send('An error occurred while updating the profile');
+        res.status(500).send('Error updating user profile: ' + error.message);
     }
 });
 
-// POST route for deleting a file
-app.post('/deletefile', (req, res) => {
-    const { fileName } = req.body;
-    if (!fileName) {
-        return res.status(400).send('Filename is missing from the request body');
-    }
-
-    const filePath = path.join(uploadsDir, fileName);
-    fs.unlink(filePath, (err) => {
-        if (err) {
-            console.error('Error deleting file:', err);
-            return res.status(500).send('An error occurred while deleting the file');
-        }
-
-        // Remove the file entry from the CSV
-        readUploadsFromCsv()
-            .then((uploads) => {
-                const updatedUploads = uploads.filter(upload => upload.Filename !== fileName);
-                return writeUploadsToCsv(updatedUploads);
-            })
-            .then(() => {
-                res.redirect('/dashboard');
-            })
-            .catch((error) => {
-                console.error('Error updating CSV:', error);
-                res.status(500).send('An error occurred while updating the CSV');
-            });
-    });
-});
-
-// GET route for clearing uploads
-app.get('/clear-uploads', checkAuth, (req, res) => {
-    try {
-        clearResumeUploadCsv();
-        res.send('All uploads have been cleared successfully.');
-    } catch (error) {
-        console.error('Error clearing uploads:', error);
-        res.status(500).send('An error occurred while clearing uploads.');
-    }
-});
-
-// GET route for clearing users
-app.get('/clear-users', checkAuth, (req, res) => {
-    try {
-        clearUserProfileCsv();
-        req.session.destroy(); // Destroy the current session
-        res.send('All user information has been cleared successfully. You will be logged out.');
-    } catch (error) {
-        console.error('Error clearing user information:', error);
-        res.status(500).send('An error occurred while clearing user information.');
-    }
-});
-
-function clearUserProfileCsv() {
-    const header = 'Email,Password,FirstName,LastName,MobileNumber,Country,City,State,ZipCode,RegistrationDate,Role,Archived,ResetToken,ResetTokenExpires,Company,ManagerId,SupervisorId\n';
-    fs.writeFileSync(userProfileFilePath, header, 'utf8');
-    console.log('userprofile.csv has been cleared and reset with header.');
-}
-
-// Helper function to group users by company
-function groupUsersByCompany(users) {
-    return users.reduce((acc, user) => {
-        const company = user.company || 'IA';
-        if (!acc[company]) {
-            acc[company] = [];
-        }
-        acc[company].push(user);
-        return acc;
-    }, {});
-}
-
-// User List route
 app.get('/user-list', checkAuth, async (req, res) => {
     try {
+        console.log('Fetching user list');
+        console.log('Current user:', req.session.user);
+        
         const allUsers = await readUsersFromCsv();
+        console.log('All users:', allUsers);
+        
         let filteredUsers;
 
         switch (req.session.user.role) {
@@ -751,83 +479,47 @@ app.get('/user-list', checkAuth, async (req, res) => {
                 break;
             case 'Manager':
                 filteredUsers = allUsers.filter(u => 
-                    u.company === req.session.user.company && 
-                    (u.managerId === req.session.user.id || u.id === req.session.user.id || u.role === 'User' || u.role === 'Supervisor')
+                    u.Company === req.session.user.company && 
+                    (u['Manager ID'] === req.session.user.id || u.ID === req.session.user.id || u.Role === 'User' || u.Role === 'Supervisor')
                 );
                 break;
             case 'Supervisor':
                 filteredUsers = allUsers.filter(u => 
-                    u.company === req.session.user.company && 
-                    (u.supervisorId === req.session.user.id || u.id === req.session.user.id || u.role === 'User')
+                    u.Company === req.session.user.company && 
+                    (u['Supervisor ID'] === req.session.user.id || u.ID === req.session.user.id || u.Role === 'User')
                 );
                 break;
             default: // Regular User
-                filteredUsers = allUsers.filter(u => u.id === req.session.user.id);
+                filteredUsers = allUsers.filter(u => u.ID === req.session.user.id);
                 break;
         }
+
+        console.log('Filtered users:', filteredUsers);
 
         res.render('user-list', { 
             users: filteredUsers, 
             currentUser: req.session.user,
             getManagerName: (id) => {
-                const manager = allUsers.find(u => u.id === id);
-                return manager ? `${manager.firstName} ${manager.lastName}` : 'N/A';
+                const manager = allUsers.find(u => u.ID === id);
+                return manager ? `${manager['First Name']} ${manager['Last Name']}` : 'N/A';
             },
             getSupervisorName: (id) => {
-                const supervisor = allUsers.find(u => u.id === id);
-                return supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : 'N/A';
-            },
-            groupUsersByCompany
+                const supervisor = allUsers.find(u => u.ID === id);
+                return supervisor ? `${supervisor['First Name']} ${supervisor['Last Name']}` : 'N/A';
+            }
         });
     } catch (error) {
         console.error('Error fetching user list:', error);
-        res.status(500).send('An error occurred while fetching the user list');
+        res.status(500).send('An error occurred while fetching the user list: ' + error.message);
     }
 });
 
-// Add Company route (System Admin and Admin only)
-app.post('/add-company', checkAuth, checkSystemAdmin, async (req, res) => {
-    try {
-        const { companyName } = req.body;
-        // Implement logic to add company
-        // This might involve updating a separate companies list or adding to user records
-        res.json({ success: true, message: 'Company added successfully' });
-    } catch (error) {
-        console.error('Error adding company:', error);
-        res.status(500).json({ success: false, message: 'An error occurred while adding the company' });
-    }
-});
-
-// Assign Manager route (System Admin and Admin only)
-app.post('/assign-manager', checkAuth, checkSystemAdmin, async (req, res) => {
-    try {
-        const { userId, managerId } = req.body;
-        const users = await readUsersFromCsv();
-        const userIndex = users.findIndex(u => u.id === userId);
-        const managerIndex = users.findIndex(u => u.id === managerId);
-
-        if (userIndex !== -1 && managerIndex !== -1) {
-            users[userIndex].managerId = managerId;
-            users[userIndex].company = users[managerIndex].company;
-            await writeUsersToCsv(users);
-            res.json({ success: true, message: 'Manager assigned successfully' });
-        } else {
-            res.status(404).json({ success: false, message: 'User or manager not found' });
-        }
-    } catch (error) {
-        console.error('Error assigning manager:', error);
-        res.status(500).json({ success: false, message: 'An error occurred while assigning the manager' });
-    }
-});
-
-// Change role route
-app.post('/change-role', checkAuth, async (req, res) => {
+app.post('/change-role', checkAuth, checkSystemAdmin, async (req, res) => {
     try {
         const { userId, newRole } = req.body;
-        
-        // Check if the current user has permission to change roles
-        if (req.session.user.role !== 'System Admin' && req.session.user.role !== 'Admin') {
-            return res.status(403).json({ success: false, message: 'You do not have permission to change roles.' });
+
+        if (!['User', 'Supervisor', 'Manager', 'Admin', 'System Admin'].includes(newRole)) {
+            return res.status(400).json({ success: false, message: 'Invalid role.' });
         }
 
         // Check if the current user is trying to assign a role they don't have access to
@@ -836,13 +528,13 @@ app.post('/change-role', checkAuth, async (req, res) => {
         }
 
         const users = await readUsersFromCsv();
-        const userIndex = users.findIndex(u => u.id === userId);
+        const userIndex = users.findIndex(u => u.ID === userId);
 
         if (userIndex === -1) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        users[userIndex].role = newRole;
+        users[userIndex].Role = newRole;
         await writeUsersToCsv(users);
 
         res.json({ success: true, message: 'Role updated successfully.' });
@@ -852,7 +544,6 @@ app.post('/change-role', checkAuth, async (req, res) => {
     }
 });
 
-// Add User route (only accessible by System Admin and Admin)
 app.get('/add-user', checkAuth, checkSystemAdmin, (req, res) => {
     console.log('User session:', req.session.user);
     res.render('add-user');
@@ -864,7 +555,7 @@ app.post('/add-user', checkAuth, checkSystemAdmin, async (req, res) => {
         const users = await readUsersFromCsv();
         
         // Check if user already exists
-        if (users.find(u => u.email === email)) {
+        if (users.find(u => u.Email === email)) {
             return res.status(400).send('User with this email already exists');
         }
 
@@ -872,21 +563,21 @@ app.post('/add-user', checkAuth, checkSystemAdmin, async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = {
-            email,
-            password: hashedPassword,
-            firstName,
-            lastName,
-            mobileNumber,
-            country,
-            city,
-            state,
-            zipCode,
-            registrationDate: new Date().toISOString(),
-            role,
-            company,
-            managerId: null,
-            supervisorId: null,
-            archived: 'false'
+            ID: crypto.randomUUID(),
+            Email: email,
+            Password: hashedPassword,
+            'First Name': firstName,
+            'Last Name': lastName,
+            'Mobile Number': mobileNumber,
+            Country: country,
+            City: city,
+            State: state,
+            'Zip Code': zipCode,
+            Role: role,
+            Company: company,
+            'Manager ID': null,
+            'Supervisor ID': null,
+            isUSA: 'false'
         };
 
         users.push(newUser);
@@ -899,16 +590,15 @@ app.post('/add-user', checkAuth, checkSystemAdmin, async (req, res) => {
     }
 });
 
-// Assign Supervisor route (Manager only)
 app.post('/assign-supervisor', checkAuth, checkManagerOrAbove, async (req, res) => {
     try {
         const { userId, supervisorId } = req.body;
         const users = await readUsersFromCsv();
-        const userIndex = users.findIndex(u => u.id === userId);
-        const supervisorIndex = users.findIndex(u => u.id === supervisorId);
+        const userIndex = users.findIndex(u => u.ID === userId);
+        const supervisorIndex = users.findIndex(u => u.ID === supervisorId);
         
         if (userIndex !== -1 && supervisorIndex !== -1) {
-            users[userIndex].supervisorId = supervisorId;
+            users[userIndex]['Supervisor ID'] = supervisorId;
             await writeUsersToCsv(users);
             res.json({ success: true });
         } else {
@@ -920,7 +610,6 @@ app.post('/assign-supervisor', checkAuth, checkManagerOrAbove, async (req, res) 
     }
 });
 
-// Logout route
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
@@ -931,32 +620,8 @@ app.get('/logout', (req, res) => {
     });
 });
 
-// Start the server
-const server = http.createServer(app);
-
-server.on('error', (error) => {
-    console.error('Server error:', error);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-
 app.get('/check-session', (req, res) => {
     res.json(req.session.user || { message: 'Not logged in' });
-});
-
-fs.access(userProfileFilePath, fs.constants.F_OK | fs.constants.R_OK, (err) => {
-    if (err) {
-        console.error(`${userProfileFilePath} ${err.code === 'ENOENT' ? 'does not exist' : 'is not readable'}`);
-    } else {
-        console.log(`${userProfileFilePath} exists and is readable`);
-    }
 });
 
 app.get('/debug-users', async (req, res) => {
@@ -976,16 +641,29 @@ app.post('/reset-password', async (req, res) => {
     // Implement password reset logic here
 });
 
-// Route to render the upload form
 app.get('/upload', (req, res) => {
     res.render('upload', { message: null });
 });
 
-// Route to handle file upload
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.render('upload', { message: 'No file uploaded. Please try again.' });
     }
     console.log('File uploaded:', req.file);
     res.render('upload', { message: 'File uploaded successfully!' });
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
+
+// Error handling
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
