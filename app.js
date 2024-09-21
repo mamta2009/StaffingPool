@@ -138,10 +138,10 @@ async function readUploadsFromCsv() {
                     uploads.push({
                         ID: row.ID,
                         Filename: row.Filename,
-                        OriginalName: row['Original Name'],
-                        UploadDate: row['Upload Date'],
-                        UploadedBy: row['Uploaded By'],
-                        FileType: row['File Type'],
+                        'Original Name': row['Original Name'],
+                        'Upload Date': row['Upload Date'],
+                        'Uploaded By': row['Uploaded By'],
+                        'File Type': row['File Type'],
                         Description: row.Description
                     });
                 })
@@ -174,7 +174,6 @@ async function writeUploadsToCsv(uploads) {
 
     await csvWriter.writeRecords(uploads);
 }
-
 // Middleware
 function checkAuth(req, res, next) {
     if (!req.session.user) {
@@ -350,6 +349,7 @@ app.post('/register', async (req, res) => {
 app.get('/dashboard', checkAuth, async (req, res) => {
     try {
         const uploads = await readUploadsFromCsv();
+        console.log('Uploads:', uploads); // Log the uploads array
         res.render('dashboard', { user: req.session.user, files: uploads });
     } catch (error) {
         console.error('Error reading uploads:', error);
@@ -363,6 +363,7 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
         const uploads = await readUploadsFromCsv();
 
         for (const file of req.files) {
+            console.log('Uploaded file:', file.originalname); // Log the file name
             const newUpload = {
                 ID: crypto.randomUUID(),
                 Filename: file.filename,
@@ -373,6 +374,7 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
                 Description: fileDescription
             };
             uploads.push(newUpload);
+            console.log('Uploaded file:', newUpload);
         }
 
         await writeUploadsToCsv(uploads);
@@ -624,6 +626,46 @@ app.get('/check-session', (req, res) => {
     res.json(req.session.user || { message: 'Not logged in' });
 });
 
+app.post('/deletefile', checkAuth, async (req, res) => {
+    console.log('Received request to delete file');
+    console.log('Request body:', req.body);
+    const { fileName } = req.body;
+
+    if (!fileName) {
+        console.log('Filename is missing in the request body');
+        return res.status(400).send('Filename is required');
+    }
+
+    console.log('Filename received:', fileName);
+
+    try {
+        // Read the CSV file to find the file entry
+        const uploads = await readUploadsFromCsv();
+        const fileIndex = uploads.findIndex(file => file.Filename === fileName);
+
+        if (fileIndex === -1) {
+            console.log('File not found in CSV:', fileName);
+            return res.status(404).send('File not found');
+        }
+
+        // Remove the file entry from the CSV data
+        const [fileToDelete] = uploads.splice(fileIndex, 1);
+
+        // Write the updated data back to the CSV file
+        await writeUploadsToCsv(uploads);
+
+        // Delete the file from the file system
+        const filePath = path.join(uploadsDir, fileName);
+        await fs.unlink(filePath);
+
+        console.log('File deleted successfully:', filePath);
+        res.status(200).send('File deleted successfully');
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        res.status(500).send('Error deleting file');
+    }
+});
+
 app.get('/debug-users', async (req, res) => {
     try {
         const users = await readUsersFromCsv();
@@ -649,7 +691,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.render('upload', { message: 'No file uploaded. Please try again.' });
     }
-    console.log('File uploaded:', req.file);
+    console.log('File uploaded:', req.file.originalname); // Log the file name
     res.render('upload', { message: 'File uploaded successfully!' });
 });
 

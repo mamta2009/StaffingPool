@@ -137,24 +137,26 @@
             <table>
                 <thead>
                     <tr>
-                        <th>File Name</th>
+                        <th>Original Name</th>
+                        <th>Filename</th>
                         <th>File Type</th>
                         <th>Description</th>
-                        <th>Date Uploaded</th>
+                        <th>Upload Date</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% files.forEach(file => { %>
                         <tr>
-                            <td><%= file.OriginalName %></td>
-                            <td><%= file.FileType %></td>
+                            <td><%= file['Original Name'] || 'N/A' %></td>
+                            <td><%= file.Filename || 'N/A' %></td>
+                            <td><%= file['File Type'] || 'N/A' %></td>
                             <td><%= file.Description || 'No description' %></td>
-                            <td><%= new Date(file.UploadDate).toLocaleString() %></td>
+                            <td><%= file['Upload Date'] ? new Date(file['Upload Date']).toLocaleString() : 'N/A' %></td>
                             <td>
                                 <form id="delete-form-<%= file.Filename %>" action="/deletefile" method="POST" style="display:inline;">
                                     <input type="hidden" name="fileName" value="<%= file.Filename %>">
-                                    <button type="button" class="delete-btn" onclick="confirmDelete('<%= file.Filename %>', '<%= file.OriginalName %>')">Delete</button>
+                                    <button type="button" class="delete-btn" onclick="confirmDelete('<%= file.Filename %>', '<%= file['Original Name'] %>')">Delete</button>
                                 </form>
                                 <form action="/matchjob" method="POST" style="display:inline;">
                                     <input type="hidden" name="fileName" value="<%= file.Filename %>">
@@ -193,7 +195,7 @@
     </form>
     <script>
         function confirmDelete(fileName, originalName) {
-            if (confirm(`Are you sure you want to delete ${originalName}?`)) {
+            if (confirm(`Are you sure you want to delete the file "${originalName}"?`)) {
                 document.getElementById(`delete-form-${fileName}`).submit();
             }
         }
