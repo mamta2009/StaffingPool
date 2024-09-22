@@ -1,4 +1,4 @@
 ID,First Name,Last Name,Email,Password,Role,Company,Manager ID,Supervisor ID,Mobile Number,Street,City,State,Zip Code,Country,isUSA
 ,,,,,,,,,,,,,,,false
 ,,,,,,,,,,,,,,,false
-2b5ceb00-9cfd-4a71-abc9-9b127af04e07,BB,AA,baibhavthapa@icloud.com,$2b$10$kdJmL6V0OiTLZxJZJcTe3uZtsgLRXzCU9bnZSBa4iiIF/Q/l1281u,User,IA,,,,,,,,,false
+2b5ceb00-9cfd-4a71-abc9-9b127af04e07,BB@,AA,baibhavthapa@icloud.com,$2b$10$kdJmL6V0OiTLZxJZJcTe3uZtsgLRXzCU9bnZSBa4iiIF/Q/l1281u,User,IA,,,,,,,,,false

@@ -50,13 +50,11 @@ async function ensureDirExists(dir) {
 
 // Set up multer storage
 const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        await ensureDirExists(uploadsDir);
-        cb(null, uploadsDir);
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
     },
     filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${file.originalname}`;
-        cb(null, uniqueName);
+        cb(null, file.originalname); // Keep the original filename
     }
 });
 
@@ -366,7 +364,7 @@ app.post('/upload', checkAuth, upload.array('files'), async (req, res) => {
             console.log('Uploaded file:', file.originalname); // Log the file name
             const newUpload = {
                 ID: crypto.randomUUID(),
-                Filename: file.filename,
+                Filename: file.originalname, // Use the original filename
                 'Original Name': file.originalname,
                 'Upload Date': new Date().toLocaleString(),
                 'Uploaded By': req.session.user.email,
@@ -655,11 +653,11 @@ app.post('/deletefile', checkAuth, async (req, res) => {
         await writeUploadsToCsv(uploads);
 
         // Delete the file from the file system
-        const filePath = path.join(uploadsDir, fileName);
+        const filePath = path.join('uploads', fileName);
         await fs.unlink(filePath);
 
         console.log('File deleted successfully:', filePath);
-        res.status(200).send('File deleted successfully');
+        res.redirect('/dashboard'); // Redirect to the dashboard
     } catch (error) {
         console.error('Error deleting file:', error);
         res.status(500).send('Error deleting file');
