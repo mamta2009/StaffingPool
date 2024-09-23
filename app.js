@@ -62,57 +62,61 @@ const upload = multer({ storage: storage });
 
 // Helper functions
 async function readUsersFromCsv() {
-    const users = [];
-    const fileContent = await fs.readFile(userProfileFilePath, 'utf8');
-    return new Promise((resolve, reject) => {
-        const stream = require('stream');
-        const bufferStream = new stream.PassThrough();
-        bufferStream.end(fileContent);
+    try {
+        const users = [];
+        const fileContent = await fs.readFile(userProfileFilePath, 'utf8');
+        return new Promise((resolve, reject) => {
+            const stream = require('stream');
+            const bufferStream = new stream.PassThrough();
+            bufferStream.end(fileContent);
 
-        bufferStream
-            .pipe(csv())
-            .on('data', (row) => {
-                // Only add rows with non-empty email addresses
-                if (row.Email && row.Email.trim() !== '') {
-                    row.isUSA = row.isUSA.toLowerCase() === 'true';
-                    users.push(row);
-                }
-            })
-            .on('end', () => {
-                console.log('CSV file successfully processed');
-                resolve(users);
-            })
-            .on('error', (error) => {
-                console.error('Error reading CSV:', error);
-                reject(error);
-            });
-    });
+            bufferStream
+                .pipe(csv())
+                .on('data', (row) => {
+                    // Only add rows with non-empty email addresses
+                    if (row.Email && row.Email.trim() !== '') {
+                        users.push(row);
+                    }
+                })
+                .on('end', () => {
+                    console.log('CSV file successfully processed');
+                    resolve(users);
+                })
+                .on('error', (error) => {
+                    console.error('Error reading CSV:', error);
+                    reject(error);
+                });
+        });
+    } catch (error) {
+        console.error('Error reading users from CSV:', error);
+        throw error;
+    }
 }
 
 async function writeUsersToCsv(users) {
-    const csvWriter = createCsvWriter({
-        path: userProfileFilePath,
-        header: [
-            {id: 'id', title: 'ID'},
-            {id: 'firstName', title: 'First Name'},
-            {id: 'lastName', title: 'Last Name'},
-            {id: 'email', title: 'Email'},
-            {id: 'password', title: 'Password'},
-            {id: 'role', title: 'Role'},
-            {id: 'company', title: 'Company'},
-            {id: 'managerId', title: 'Manager ID'},
-            {id: 'supervisorId', title: 'Supervisor ID'},
-            {id: 'mobileNumber', title: 'Mobile Number'},
-            {id: 'street', title: 'Street'},
-            {id: 'city', title: 'City'},
-            {id: 'state', title: 'State'},
-            {id: 'zipCode', title: 'Zip Code'},
-            {id: 'country', title: 'Country'},
-            {id: 'isUSA', title: 'isUSA'}
-        ]
-    });
-
     try {
+        const csvWriter = createCsvWriter({
+            path: userProfileFilePath,
+            header: [
+                {id: 'ID', title: 'ID'},
+                {id: 'First Name', title: 'First Name'},
+                {id: 'Last Name', title: 'Last Name'},
+                {id: 'Email', title: 'Email'},
+                {id: 'Password', title: 'Password'},
+                {id: 'Role', title: 'Role'},
+                {id: 'Company', title: 'Company'},
+                {id: 'Manager ID', title: 'Manager ID'},
+                {id: 'Supervisor ID', title: 'Supervisor ID'},
+                {id: 'Mobile Number', title: 'Mobile Number'},
+                {id: 'Street', title: 'Street'},
+                {id: 'City', title: 'City'},
+                {id: 'State', title: 'State'},
+                {id: 'Zip Code', title: 'Zip Code'},
+                {id: 'Country', title: 'Country'},
+                {id: 'isUSA', title: 'isUSA'}
+            ]
+        });
+
         await csvWriter.writeRecords(users);
         console.log('CSV file was written successfully');
     } catch (error) {
@@ -172,12 +176,29 @@ async function writeUploadsToCsv(uploads) {
 
     await csvWriter.writeRecords(uploads);
 }
+
+const roles = {
+    ADMIN: 'admin',
+    USER: 'user'
+};
+
+function checkRole(role) {
+    return (req, res, next) => {
+        if (req.session.user && req.session.user.role === role) {
+            next();
+        } else {
+            res.status(403).send('Access denied');
+        }
+    };
+}
+
 // Middleware
 function checkAuth(req, res, next) {
-    if (!req.session.user) {
-        return res.redirect('/login');
+    if (req.session.user) {
+        next();
+    } else {
+        res.redirect('/login');
     }
-    next();
 }
 
 function checkAdmin(req, res, next) {
@@ -285,7 +306,18 @@ app.post('/register', async (req, res) => {
         const { firstName, lastName, email, password, confirmPassword } = req.body;
         console.log('Registration attempt for:', email);
 
+        if (!firstName || !lastName || !email || !password || !confirmPassword) {
+            console.log('Missing required fields');
+            return res.render('register', { 
+                error: 'All fields are required', 
+                firstName, 
+                lastName, 
+                email 
+            });
+        }
+
         if (password !== confirmPassword) {
+            console.log('Passwords do not match');
             return res.render('register', { 
                 error: 'Passwords do not match', 
                 firstName, 
@@ -298,6 +330,7 @@ app.post('/register', async (req, res) => {
         console.log('Current users count:', users.length);
 
         if (users.some(user => user.Email === email)) {
+            console.log('Email already registered:', email);
             return res.render('register', { 
                 error: 'Email already registered', 
                 firstName, 
@@ -343,7 +376,6 @@ app.post('/register', async (req, res) => {
         });
     }
 });
-
 app.get('/dashboard', checkAuth, async (req, res) => {
     try {
         const uploads = await readUploadsFromCsv();
@@ -455,14 +487,14 @@ app.post('/userprofileupdate/:id?', checkAuth, async (req, res) => {
             console.log('Updated session user:', req.session.user);
         }
 
-        res.redirect('/user-list');
+        res.redirect('/userlist');
     } catch (error) {
         console.error('Error updating user profile:', error);
         res.status(500).send('Error updating user profile: ' + error.message);
     }
 });
 
-app.get('/user-list', checkAuth, async (req, res) => {
+app.get('/userlist', checkAuth, async (req, res) => {
     try {
         console.log('Fetching user list');
         console.log('Current user:', req.session.user);
@@ -496,7 +528,7 @@ app.get('/user-list', checkAuth, async (req, res) => {
 
         console.log('Filtered users:', filteredUsers);
 
-        res.render('user-list', { 
+        res.render('userlist', { 
             users: filteredUsers, 
             currentUser: req.session.user,
             getManagerName: (id) => {
@@ -514,16 +546,22 @@ app.get('/user-list', checkAuth, async (req, res) => {
     }
 });
 
-app.post('/change-role', checkAuth, checkSystemAdmin, async (req, res) => {
+app.post('/change-role', checkAuth, checkAdmin, async (req, res) => {
     try {
         const { userId, newRole } = req.body;
+        const currentUser = req.session.user;
 
         if (!['User', 'Supervisor', 'Manager', 'Admin', 'System Admin'].includes(newRole)) {
             return res.status(400).json({ success: false, message: 'Invalid role.' });
         }
 
+        // Prevent changing own role
+        if (userId === currentUser.id) {
+            return res.status(403).json({ success: false, message: 'You cannot change your own role.' });
+        }
+
         // Check if the current user is trying to assign a role they don't have access to
-        if (req.session.user.role !== 'System Admin' && newRole === 'System Admin') {
+        if (currentUser.role !== 'System Admin' && newRole === 'System Admin') {
             return res.status(403).json({ success: false, message: 'Only System Admins can assign the System Admin role.' });
         }
 
@@ -534,10 +572,18 @@ app.post('/change-role', checkAuth, checkSystemAdmin, async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
+        // Prevent removing the last admin
+        if (users[userIndex].Role === 'Admin' && newRole !== 'Admin') {
+            const adminCount = users.filter(u => u.Role === 'Admin').length;
+            if (adminCount <= 1) {
+                return res.status(403).json({ success: false, message: 'Cannot remove the last admin.' });
+            }
+        }
+
         users[userIndex].Role = newRole;
         await writeUsersToCsv(users);
 
-        res.json({ success: true, message: 'Role updated successfully.' });
+        res.redirect('/userlist');
     } catch (error) {
         console.error('Error changing role:', error);
         res.status(500).json({ success: false, message: 'An error occurred while changing the role.' });
@@ -583,7 +629,7 @@ app.post('/add-user', checkAuth, checkSystemAdmin, async (req, res) => {
         users.push(newUser);
         await writeUsersToCsv(users);
 
-        res.redirect('/user-list');
+        res.redirect('/userlist');
     } catch (error) {
         console.error('Error adding new user:', error);
         res.status(500).send('An error occurred while adding the new user');
@@ -624,7 +670,7 @@ app.get('/check-session', (req, res) => {
     res.json(req.session.user || { message: 'Not logged in' });
 });
 
-app.post('/deletefile', checkAuth, async (req, res) => {
+app.post('/deletefile', checkAuth, checkRole(roles.ADMIN), async (req, res) => {
     console.log('Received request to delete file');
     console.log('Request body:', req.body);
     const { fileName } = req.body;
@@ -653,7 +699,7 @@ app.post('/deletefile', checkAuth, async (req, res) => {
         await writeUploadsToCsv(uploads);
 
         // Delete the file from the file system
-        const filePath = path.join('uploads', fileName);
+        const filePath = path.join(uploadsDir, fileName);
         await fs.unlink(filePath);
 
         console.log('File deleted successfully:', filePath);
@@ -691,6 +737,21 @@ app.post('/upload', upload.single('file'), (req, res) => {
     }
     console.log('File uploaded:', req.file.originalname); // Log the file name
     res.render('upload', { message: 'File uploaded successfully!' });
+});
+
+// Route accessible only by admin
+app.get('/admin', checkAuth, checkRole(roles.ADMIN), (req, res) => {
+    res.send('Welcome Admin');
+});
+
+// Route accessible only by regular users
+app.get('/user', checkAuth, checkRole(roles.USER), (req, res) => {
+    res.send('Welcome User');
+});
+
+// Route accessible by both admin and regular users
+app.get('/dashboard', checkAuth, (req, res) => {
+    res.render('dashboard', { user: req.session.user, files: uploads });
 });
 
 // Start the server

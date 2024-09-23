@@ -68,16 +68,33 @@
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
+                    <th>Role</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <% users.forEach(user => { %>
                     <tr>
-                        <td><%= user.firstName %> <%= user.lastName %></td>
-                        <td><%= user.email %></td>
+                        <td><%= user['First Name'] %> <%= user['Last Name'] %></td>
+                        <td><%= user.Email %></td>
                         <td>
-                            <a href="/userprofileupdate/<%= user._id %>" class="edit-link">Edit Profile</a>
+                            <% if (currentUser.role === 'Admin' || currentUser.role === 'System Admin') { %>
+                                <form action="/change-role" method="POST" style="display: inline;">
+                                    <input type="hidden" name="userId" value="<%= user.ID %>">
+                                    <select name="newRole" onchange="this.form.submit()">
+                                        <option value="User" <%= user.Role === 'User' ? 'selected' : '' %>>User</option>
+                                        <option value="Supervisor" <%= user.Role === 'Supervisor' ? 'selected' : '' %>>Supervisor</option>
+                                        <option value="Manager" <%= user.Role === 'Manager' ? 'selected' : '' %>>Manager</option>
+                                        <option value="Admin" <%= user.Role === 'Admin' ? 'selected' : '' %>>Admin</option>
+                                        <option value="System Admin" <%= user.Role === 'System Admin' ? 'selected' : '' %>>System Admin</option>
+                                    </select>
+                                </form>
+                            <% } else { %>
+                                <%= user.Role %>
+                            <% } %>
+                        </td>
+                        <td>
+                            <a href="/userprofileupdate/<%= user.ID %>" class="edit-link">Edit Profile</a>
                         </td>
                     </tr>
                 <% }); %>
