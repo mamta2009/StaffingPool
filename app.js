@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const http = require('http');
 const User = require('./models/User');
+const archiver = require('archiver');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -92,6 +93,7 @@ async function readUsersFromCsv() {
         throw error;
     }
 }
+
 
 async function writeUsersToCsv(users) {
     try {
@@ -235,7 +237,87 @@ app.get('/login', (req, res) => {
         showResetLink: false
     });
 });
+// ... (previous code remains the same)
 
+
+app.post('/exportfiles', async (req, res) => {
+    console.log('Entering /exportfiles route');
+    console.log('Request body:', req.body);
+
+    try {
+        let selectedFiles = req.body.selectedFiles;
+        console.log('Selected files:', selectedFiles);
+        
+        // Ensure selectedFiles is always an array
+        if (!Array.isArray(selectedFiles)) {
+            selectedFiles = [selectedFiles];
+        }
+        
+        if (!selectedFiles || selectedFiles.length === 0) {
+            console.log('No files selected for export');
+            return res.status(400).send('No files selected for export');
+        }
+
+        // Create a temporary directory for exported files
+        const exportDir = path.join(__dirname, 'exported_files');
+        console.log('Export directory:', exportDir);
+        await fs.mkdir(exportDir, { recursive: true });
+
+        // Copy selected files to the export directory
+        for (const filename of selectedFiles) {
+            const sourcePath = path.join(__dirname, 'uploads', filename);
+            const destPath = path.join(exportDir, filename);
+            console.log(`Copying file from ${sourcePath} to ${destPath}`);
+            
+            try {
+                await fs.access(sourcePath);
+                await fs.copyFile(sourcePath, destPath);
+            } catch (err) {
+                console.error(`Error copying file ${filename}:`, err);
+                // Skip this file and continue with others
+                continue;
+            }
+        }
+
+        // Create a zip file of the exported files
+        const zipFilename = `exported_files_${Date.now()}.zip`;
+        const zipFilePath = path.join(__dirname, zipFilename);
+        console.log('Zip file path:', zipFilePath);
+        const output = require('fs').createWriteStream(zipFilePath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', () => {
+            console.log('Zip file created successfully');
+            // Send the zip file to the client
+            res.download(zipFilePath, zipFilename, async (err) => {
+                if (err) {
+                    console.error('Error sending zip file:', err);
+                }
+                console.log('Cleaning up temporary files');
+                // Clean up: delete the zip file and exported files
+                try {
+                    await fs.unlink(zipFilePath);
+                    await fs.rm(exportDir, { recursive: true, force: true });
+                } catch (cleanupErr) {
+                    console.error('Error during cleanup:', cleanupErr);
+                }
+            });
+        });
+
+        archive.on('error', (err) => {
+            console.error('Error creating zip file:', err);
+            throw err;
+        });
+
+        archive.pipe(output);
+        archive.directory(exportDir, false);
+        archive.finalize();
+
+    } catch (error) {
+        console.error('Error exporting files:', error);
+        res.status(500).send('An error occurred while exporting files');
+    }
+});
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -296,6 +378,7 @@ app.post('/login', async (req, res) => {
         });
     }
 });
+
 
 app.get('/register', (req, res) => {
     res.render('register', { error: null, email: req.query.email || '' });

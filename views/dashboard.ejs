@@ -134,53 +134,55 @@
         <h1>Welcome, <%= user.firstName %> <%= user.lastName %></h1>
         <div class="file-list">
             <h2>List of files uploaded</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Original Name</th>
-                        <th>Filename</th>
-                        <th>File Type</th>
-                        <th>Description</th>
-                        <th>Upload Date</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% files.forEach(file => { %>
-                        <tr>
-                            <td><%= file['Original Name'] || 'N/A' %></td>
-                            <td><%= file.Filename || 'N/A' %></td>
-                            <td><%= file['File Type'] || 'N/A' %></td>
-                            <td><%= file.Description || 'No description' %></td>
-                            <td><%= file['Upload Date'] ? new Date(file['Upload Date']).toLocaleString() : 'N/A' %></td>
-                            <td>
-                                <form id="delete-form-<%= file.Filename %>" action="/deletefile" method="POST" style="display:inline;">
-                                    <input type="hidden" name="fileName" value="<%= file.Filename %>">
-                                    <button type="button" class="delete-btn" onclick="confirmDelete('<%= file.Filename %>', '<%= file['Original Name'] %>')">Delete</button>
-                                </form>
-                                <form action="/matchjob" method="POST" style="display:inline;">
-                                    <input type="hidden" name="fileName" value="<%= file.Filename %>">
-                                    <button type="submit" class="match-btn">Match with Job Description</button>
-                                </form>
-                                <% if (!file.Description) { %>
-                                    <form action="/adddescription" method="POST" style="display:inline;">
-                                        <input type="hidden" name="fileName" value="<%= file.Filename %>">
-                                        <input type="text" name="fileDescription" placeholder="Add description">
-                                        <button type="submit" class="match-btn">Add</button>
-                                    </form>
-                                <% } %>
-                            </td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        </div>
-        <div class="export-form">
-            <h2>Export Files</h2>
             <form action="/exportfiles" method="POST">
-                <button type="submit" class="export-btn">Export All Files</button>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Select</th>
+                            <th>Original Name</th>
+                            <th>Filename</th>
+                            <th>File Type</th>
+                            <th>Description</th>
+                            <th>Upload Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% files.forEach(file => { %>
+                            <tr>
+                                <td>
+                                    <input type="checkbox" id="<%= file.Filename %>" name="selectedFiles" value="<%= file.Filename %>">
+                                </td>
+                                <td><%= file['Original Name'] || 'N/A' %></td>
+                                <td><%= file.Filename || 'N/A' %></td>
+                                <td><%= file['File Type'] || 'N/A' %></td>
+                                <td><%= file.Description || 'No description' %></td>
+                                <td><%= file['Upload Date'] ? new Date(file['Upload Date']).toLocaleString() : 'N/A' %></td>
+                                <td>
+                                    <form id="delete-form-<%= file.Filename %>" action="/deletefile" method="POST" style="display:inline;">
+                                        <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                        <button type="button" class="delete-btn" onclick="confirmDelete('<%= file.Filename %>', '<%= file['Original Name'] %>')">Delete</button>
+                                    </form>
+                                    <form action="/matchjob" method="POST" style="display:inline;">
+                                        <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                        <button type="submit" class="match-btn">Match with Job Description</button>
+                                    </form>
+                                    <% if (!file.Description) { %>
+                                        <form action="/adddescription" method="POST" style="display:inline;">
+                                            <input type="hidden" name="fileName" value="<%= file.Filename %>">
+                                            <input type="text" name="fileDescription" placeholder="Add description">
+                                            <button type="submit" class="match-btn">Add</button>
+                                        </form>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <button type="submit" class="export-btn">Export Selected Files</button>
             </form>
         </div>
+       
     </div>
     <form id="upload-form" class="hidden-upload-form" action="/upload" method="POST" enctype="multipart/form-data">
         <h2>Upload Files</h2>
